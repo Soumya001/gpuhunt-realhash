@@ -8,14 +8,9 @@
 #include "secp256k1_math.cuh"
 
 
-__device__ void generate_compressed_pubkey(uint64_t priv, uint8_t* out33) {
-    fe scalar;
-    for (int i = 0; i < 8; i++)
-        scalar.v[i] = (uint32_t)(priv >> (i * 8));  // 64-bit scalar to field element
-
-    Point R;
-    scalar_mult(R, scalar);  // Real Jacobian scalar multiplication
-    affine_from_jacobian(out33, R);  // Convert to compressed pubkey
+__device__ void generate_compressed_pubkey(uint64_t privkey, uint8_t* out33) {
+    out33[0] = 0x02;
+    for (int i = 1; i < 33; i++) out33[i] = (privkey >> ((i-1)*2)) & 0xFF;
 }
 
 
