@@ -3,9 +3,9 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include "sha256.cuh"
+#include "ripemd160.cuh"
 
-extern __device__ void sha256(const uint8_t* data, size_t len, uint8_t* out32);
-extern __device__ void ripemd160(const uint8_t* data, size_t len, uint8_t* out20);
 
 __device__ void generate_fake_pubkey(uint64_t privkey, uint8_t* out33) {
     out33[0] = 0x02; // Compressed
