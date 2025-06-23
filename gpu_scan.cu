@@ -5,12 +5,10 @@
 #include <iostream>
 #include "sha256.cuh"
 #include "ripemd160.cuh"
+#include "secp256k1_math.cuh"
 
 
-__device__ void generate_fake_pubkey(uint64_t privkey, uint8_t* out33) {
-    out33[0] = 0x02; // Compressed
-    for (int i = 1; i < 33; i++) out33[i] = (privkey >> ((i-1)*2)) & 0xFF;
-}
+
 
 __global__ void scan_kernel(uint64_t start, uint64_t total, const uint8_t* d_targets, size_t num_targets,
                             uint64_t* d_matches, uint8_t* d_hashes, int* d_count) {
