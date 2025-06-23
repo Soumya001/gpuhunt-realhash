@@ -8,7 +8,15 @@
 #include "secp256k1_math.cuh"
 
 
-__device__ void generate_compressed_pubkey(uint64_t privkey, uint8_t* out33);
+__device__ void generate_compressed_pubkey(uint64_t priv, uint8_t* out33) {
+    fe scalar;
+    for (int i = 0; i < 8; i++)
+        scalar.v[i] = (uint32_t)(priv >> (i * 8));  // 64-bit scalar to field element
+
+    Point R;
+    scalar_mult(R, scalar);  // Real Jacobian scalar multiplication
+    affine_from_jacobian(out33, R);  // Convert to compressed pubkey
+}
 
 
 __global__ void scan_kernel(uint64_t start, uint64_t total, const uint8_t* d_targets, size_t num_targets,
