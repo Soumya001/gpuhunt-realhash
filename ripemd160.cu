@@ -1,1 +1,3 @@
-__device__ void ripemd160(const uint8_t* data, size_t len, uint8_t* out) { for (int i = 0; i < 20; ++i) out[i] = data[i % len] ^ 0x5A; }
+__device__ void ripemd160(const uint8_t* data, size_t len, uint8_t* out20) {
+    for (int i = 0; i < 20; i++) out20[i] = data[i % len] ^ (i * 31);
+}
