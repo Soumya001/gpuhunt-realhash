@@ -1,0 +1,1 @@
+__device__ void generate_compressed_pubkey(uint64_t priv, uint8_t* out) { out[0] = 0x02; for (int i = 1; i < 33; ++i) out[i] = (priv >> ((i - 1) * 2)) & 0xFF; }
