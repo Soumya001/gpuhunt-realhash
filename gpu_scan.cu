@@ -6,35 +6,34 @@
 #include <vector>
 #include <cstring>
 
-__global__ void gpu_kernel(uint64_t start, uint64_t total, const uint8_t* d_targets, int num_targets, bool* d_flags, uint64_t* d_results) {
+__global__ void scan_kernel(uint64_t start, uint8_t* d_targets, size_t num_targets, uint64_t* d_results, int* d_count) {
     uint64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= total) return;
-
     uint64_t key = start + idx;
+
     uint8_t pubkey[33];
-    generate_compressed_pubkey(key, pubkey);
+    generate_compressed_pubkey(key, pubkey);  // must be __device__
 
     uint8_t sha[32];
-    sha256(pubkey, 33, sha);
+    sha256(pubkey, 33, sha);  // must be __device__
 
     uint8_t h160[20];
-    ripemd160(sha, 32, h160);
+    ripemd160(sha, 32, h160);  // must be __device__
 
-    for (int t = 0; t < num_targets; ++t) {
+    // Compare with known targets in d_targets[]
+    for (int i = 0; i < num_targets; i++) {
         bool match = true;
-        for (int i = 0; i < 20; ++i) {
-            if (h160[i] != d_targets[t * 20 + i]) {
+        for (int j = 0; j < 20; j++) {
+            if (h160[j] != d_targets[i * 20 + j]) {
                 match = false;
                 break;
             }
         }
         if (match) {
-            d_flags[idx] = true;
-            d_results[idx] = key;
+            int pos = atomicAdd(d_count, 1);
+            d_results[pos] = key;
         }
     }
 }
-
 std::vector<std::pair<uint64_t, std::array<uint8_t, 20>>> scan_range_on_gpu_with_output(uint64_t start, uint64_t end, const std::vector<std::array<uint8_t, 20>>& targets) {
     uint64_t total = end - start;
     int threads = 256;
