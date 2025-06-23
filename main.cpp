@@ -47,7 +47,7 @@ int main() {
         return 1;
     }
 
-    const uint64_t default_start = 0x7000000000000000;
+    const uint64_t default_start = 0x7000014000000000;
     uint64_t start = load_last_range_or_default(default_start);
     const uint64_t chunk_size = 0x100000000000;
     const uint64_t max_end = 0x7FFFFFFFFFFFFFFF;
