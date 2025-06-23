@@ -19,7 +19,7 @@ int main() {
     }
 
     uint64_t start = 0x7000000000000000;
-    uint64_t end = 0x7000000000100000;
+    uint64_t end = 0x7000010000000000;
 
     std::vector<std::pair<uint64_t, std::array<uint8_t, 20>>> matches = scan_range_on_gpu_with_output(start, end, targets);
     for (const auto& match : matches) {
