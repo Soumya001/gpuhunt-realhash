@@ -2,6 +2,7 @@
 #include <vector>
 #include <fstream>
 #include <iomanip>
+#include <algorithm>
 #include "gpu_scan.cuh"
 #include "hash160_loader.hpp"
 
