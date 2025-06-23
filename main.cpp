@@ -20,7 +20,7 @@ int main() {
     }
 
     uint64_t start = 0x7000000000000000;
-    uint64_t chunk_size = 0x1000000;
+    uint64_t chunk_size = 0x10000000;
 
     while (start < 0x7FFFFFFFFFFFFFFF) {
         uint64_t end = start + chunk_size;
