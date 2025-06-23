@@ -19,19 +19,30 @@ int main() {
     }
 
     uint64_t start = 0x7000000000000000;
-    uint64_t end = 0x7000010000000000;
+    uint64_t chunk_size = 0x1000000;  // ~16 million keys per batch
 
-    std::vector<std::pair<uint64_t, std::array<uint8_t, 20>>> matches = scan_range_on_gpu_with_output(start, end, targets);
-    for (const auto& match : matches) {
-        std::ostringstream oss;
-        for (uint8_t b : match.second) oss << std::hex << std::setw(2) << std::setfill('0') << (int)b;
-        write_found_key(match.first, oss.str());
-        std::cout << "[MATCH] Private key: 0x" << std::hex << match.first << std::dec << " -> " << oss.str() << "\n";
+    while (start < 0x7FFFFFFFFFFFFFFF) {
+        uint64_t end = start + chunk_size;
+        std::cout << "[*] Scanning range: " << std::hex << start << " to " << end << std::dec << "\n";
+
+        std::vector<std::pair<uint64_t, std::array<uint8_t, 20>>> matches = scan_range_on_gpu_with_output(start, end, targets);
+
+        for (const auto& match : matches) {
+            std::ostringstream oss;
+            for (uint8_t b : match.second)
+                oss << std::hex << std::setw(2) << std::setfill('0') << (int)b;
+
+            write_found_key(match.first, oss.str());
+            std::cout << "[MATCH] Private key: 0x" << std::hex << match.first << std::dec << " -> " << oss.str() << "\n";
+        }
+
+        if (!matches.empty()) {
+            std::cout << "[*] Pushing found.txt to GitHub..." << std::endl;
+            system("./upload_found.sh");
+        }
+
+        start = end;
     }
 
-    if (!matches.empty()) {
-        std::cout << "[*] Pushing found.txt to GitHub..." << std::endl;
-        system("./upload_found.sh");
-    }
     return 0;
 }
