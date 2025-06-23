@@ -75,9 +75,11 @@ std::vector<std::pair<uint64_t, std::array<uint8_t, 20>>> scan_range_on_gpu_with
     cudaMemcpy(h_h160.data(), d_hashes, h_count * 20, cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < h_count; i++) {
-        std::array<uint8_t, 20> hash;
-        std::copy_n(h_h160.data() + i * 20, 20, hash.begin());
-        results.emplace_back(h_keys[i], hash);
+    std::array<uint8_t, 20> hash;
+    for (int j = 0; j < 20; ++j) {
+        hash[j] = h_h160[i * 20 + j];
+    }
+    results.emplace_back(h_keys[i], hash);
     }
 
     cudaFree(d_targets);
