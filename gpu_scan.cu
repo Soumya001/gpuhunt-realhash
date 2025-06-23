@@ -8,6 +8,7 @@
 #include "secp256k1_math.cuh"
 
 
+__device__ void generate_compressed_pubkey(uint64_t privkey, uint8_t* out33);
 
 
 __global__ void scan_kernel(uint64_t start, uint64_t total, const uint8_t* d_targets, size_t num_targets,
@@ -18,7 +19,7 @@ __global__ void scan_kernel(uint64_t start, uint64_t total, const uint8_t* d_tar
     uint64_t key = start + idx;
 
     uint8_t pubkey[33], sha[32], h160[20];
-    generate_fake_pubkey(key, pubkey);
+    generate_compressed_pubkey(key, pubkey);
     sha256(pubkey, 33, sha);
     ripemd160(sha, 32, h160);
 
