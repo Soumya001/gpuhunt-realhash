@@ -61,7 +61,7 @@ int main() {
         std::cout << "[*] Chunk " << std::setw(3) << chunk_index 
                   << " | Range: " << std::hex << start << " - " << end << std::dec << "\n";
 
-        print_nvidia_smi(); // Live GPU stats
+        print_nvidia_smi();
 
         auto matches = scan_range_on_gpu_with_output(start, end, targets);
 
@@ -77,7 +77,6 @@ int main() {
         auto chunk_end_time = std::chrono::high_resolution_clock::now();
         double duration = std::chrono::duration<double>(chunk_end_time - chunk_start_time).count();
         double speed_mkeys = static_cast<double>(chunk_size) / duration / 1e6;
-
         double remaining_chunks = static_cast<double>(max_end - end) / chunk_size;
         double eta_sec = remaining_chunks * duration;
 
@@ -86,13 +85,7 @@ int main() {
                   << " | Speed: " << speed_mkeys << " M keys/s"
                   << " | ETA: " << static_cast<int>(eta_sec / 60) << " min\n";
 
-        // Save progress
         save_last_range(end);
-
-        // Push to GitHub
-        std::cout << "[*] Pushing found.txt & range.txt to GitHub...\n";
-        (void)system("./upload_found.sh");
-
         start = end;
         chunk_index++;
     }
