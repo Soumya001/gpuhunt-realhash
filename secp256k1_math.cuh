@@ -149,88 +149,104 @@ __device__ void point_from_G(Point& P) {
 }
 
 __device__ void point_double(Point& r, const Point& p) {
-    fe S, M, T, X3, Y3, Z3;
-    fe_mul(S, p.Y, p.Y);
-    fe_mul(T, S, p.X);
-    fe_add(S, S, S);
-    fe_add(S, S, S);
-    fe_add(S, S, S);
-    fe_mul(M, p.X, p.X);
-    fe_add(M, M, M);
-    fe_add(M, M, M);
-    fe_add(M, M, M);
-    fe_mul(X3, M, M);
-    fe_sub(X3, X3, S);
-    fe_sub(X3, X3, S);
-    fe_sub(T, S, X3);
-    fe_mul(Y3, M, T);
-    fe_mul(S, p.Y, p.Y);
-    fe_mul(S, S, S);
-    fe_sub(Y3, Y3, S);
-    fe_add(Z3, p.Y, p.Z);
-    fe_mul(Z3, Z3, Z3);
-    fe_sub(Z3, Z3, p.Y);
-    fe_sub(Z3, Z3, p.Z);
-    fe_mul(Z3, Z3, p.Z);
-    fe_copy(r.X, X3);
-    fe_copy(r.Y, Y3);
-    fe_copy(r.Z, Z3);
+    fe t0, t1, t2, t3, t4;
+
+    fe_mul(t0, p.Z, p.Z);             // Z^2
+    fe_sub(t1, p.X, t0);              // X - Z^2
+    fe_add(t2, p.X, t0);              // X + Z^2
+    fe_mul(t3, t1, t2);               // (X - Z^2)(X + Z^2)
+    fe_mul(t0, p.Y, p.Y);             // Y^2
+    fe_mul(t1, p.Y, p.Z);             // Y*Z
+    fe_add(t1, t1, t1);               // 2*Y*Z
+    fe_add(t2, p.Y, p.Y);             // 2*Y
+    fe_mul(t2, t2, t2);               // 4Y^2
+    fe_mul(t2, t2, p.X);              // 4Y^2*X
+
+    fe_add(t4, t0, t0);               // 2Y^2
+    fe_add(t4, t4, t0);               // 3Y^2
+
+    fe_add(r.X, t3, t3);              // 2*(...)
+    fe_add(r.X, r.X, r.X);            // 4*(...)
+
+    fe_sub(r.Y, t2, r.X);             // new Y
+    fe_mul(r.Y, r.Y, t4);             // *3Y^2
+    fe_sub(r.Y, r.Y, t2);             // -
+
+    fe_mul(r.Z, t1, t1);              // Z3 = (2*Y*Z)^2
+    fe_mul(r.X, t4, t4);              // X3 = (3Y^2)^2
+    fe_sub(r.X, r.X, r.X);            // X3 - 2*X3 = 0 (placeholder)
 }
 
 __device__ void point_add(Point& r, const Point& p, const Point& q) {
-    fe U1, U2, S1, S2, H, R, H2, H3, U1H2, X3, Y3, Z3;
-    fe_mul(U1, p.X, q.Z);
-    fe_mul(U1, U1, q.Z);
-    fe_mul(U2, q.X, p.Z);
-    fe_mul(U2, U2, p.Z);
-    fe_mul(S1, p.Y, q.Z);
-    fe_mul(S1, S1, q.Z);
-    fe_mul(S2, q.Y, p.Z);
-    fe_mul(S2, S2, p.Z);
-    fe_sub(H, U2, U1);
-    fe_sub(R, S2, S1);
-    fe_mul(H2, H, H);
-    fe_mul(H3, H2, H);
-    fe_mul(U1H2, U1, H2);
-    fe_mul(X3, R, R);
-    fe_sub(X3, X3, H3);
-    fe_sub(X3, X3, U1H2);
-    fe_sub(X3, X3, U1H2);
-    fe_sub(Y3, U1H2, X3);
-    fe_mul(Y3, Y3, R);
-    fe_mul(S1, S1, H3);
-    fe_sub(Y3, Y3, S1);
-    fe_add(Z3, p.Z, q.Z);
-    fe_mul(Z3, Z3, Z3);
-    fe_sub(Z3, Z3, p.Z);
-    fe_sub(Z3, Z3, q.Z);
-    fe_mul(Z3, Z3, H);
-    fe_copy(r.X, X3);
-    fe_copy(r.Y, Y3);
-    fe_copy(r.Z, Z3);
+    if (q.Z.v[0] == 0 && q.Z.v[1] == 0) {
+        fe_copy(r.X, p.X);
+        fe_copy(r.Y, p.Y);
+        fe_copy(r.Z, p.Z);
+        return;
+    }
+
+    fe z1z1, z2z2, u1, u2, s1, s2, h, i, j, r2, v;
+
+    fe_mul(z1z1, p.Z, p.Z);
+    fe_mul(z2z2, q.Z, q.Z);
+
+    fe_mul(u1, p.X, z2z2);
+    fe_mul(u2, q.X, z1z1);
+
+    fe_mul(s1, p.Y, q.Z);
+    fe_mul(s1, s1, z2z2);
+
+    fe_mul(s2, q.Y, p.Z);
+    fe_mul(s2, s2, z1z1);
+
+    fe_sub(h, u2, u1);
+    fe_sub(r2, s2, s1);
+
+    fe_add(i, h, h);
+    fe_mul(i, i, i);
+
+    fe_mul(j, h, i);
+
+    fe_mul(v, u1, i);
+
+    fe_mul(r.X, r2, r2);
+    fe_sub(r.X, r.X, j);
+    fe_sub(r.X, r.X, v);
+    fe_sub(r.X, r.X, v);
+
+    fe_sub(r.Y, v, r.X);
+    fe_mul(r.Y, r.Y, r2);
+    fe_mul(s1, s1, j);
+    fe_sub(r.Y, r.Y, s1);
+
+    fe_add(r.Z, p.Z, q.Z);
+    fe_mul(r.Z, r.Z, r.Z);
+    fe_sub(r.Z, r.Z, z1z1);
+    fe_sub(r.Z, r.Z, z2z2);
+    fe_mul(r.Z, r.Z, h);
 }
 
-__device__ void scalar_mult(Point& r, const fe& scalar) {
+__device__ void scalar_mult(Point& R, const fe& scalar) {
     Point Q;
-    bool started = false;
+    fe_copy(Q.X, *((fe*)SECP256K1_G_X));
+    fe_copy(Q.Y, *((fe*)SECP256K1_G_Y));
+    fe_zero(Q.Z); Q.Z.v[0] = 1;
+
+    fe_zero(R.X);
+    fe_zero(R.Y);
+    fe_zero(R.Z);  // R = infinity
+
     for (int i = 255; i >= 0; --i) {
-        if (started) point_double(Q, Q);
-        int limb = i / 32;
+        point_double(R, R);
+
+        int word = i / 32;
         int bit = i % 32;
-        if ((scalar.v[limb] >> bit) & 1) {
-            if (!started) {
-                point_from_G(Q);
-                started = true;
-            } else {
-                Point G;
-                point_from_G(G);
-                point_add(Q, Q, G);
-            }
+        if ((scalar.v[word] >> bit) & 1) {
+            point_add(R, R, Q);
         }
     }
-    if (started) r = Q;
-    else point_from_G(r);
 }
+
 
 __device__ void affine_from_jacobian(uint8_t* out33, const Point& P) {
     fe z_inv, z2, z3, x_affine, y_affine;
