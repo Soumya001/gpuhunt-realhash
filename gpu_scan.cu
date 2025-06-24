@@ -18,7 +18,7 @@ __global__ void scan_kernel(uint64_t start, uint64_t total, const uint8_t* d_tar
         priv_bytes[24 + i] = (key >> ((7 - i) * 8)) & 0xFF;
 
     uint8_t pubkey[33], sha[32], h160[20];
-    generate_compressed_pubkey(priv_bytes, pubkey);
+__device__ void generate_compressed_pubkey(const uint8_t priv[32], uint8_t pubkey[33]);
     sha256(pubkey, 33, sha);
     ripemd160(sha, 32, h160);
 
