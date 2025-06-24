@@ -158,7 +158,7 @@ __device__ void point_double(Point &r, const Point &a) {
 }
 
 __device__ void point_add(Point &r, const Point &a, const Point &b) {
-    fe Z1Z1, Z2Z2, U1, U2, S1, S2, H, I, J, r_, V;
+    fe Z1Z1, Z2Z2, U1, U2, S1, S2, H, I, J, r_, V, tmp;
     fe_mul(Z1Z1, a.Z, a.Z);
     fe_mul(Z2Z2, b.Z, b.Z);
     fe_mul(U1, a.X, Z2Z2);
