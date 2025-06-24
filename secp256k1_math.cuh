@@ -1,4 +1,3 @@
-// secp256k1_math.cuh (FIXED)
 #pragma once
 #include <stdint.h>
 #include <cuda_runtime.h>
@@ -10,11 +9,11 @@ __device__ __constant__ uint32_t SECP256K1_P[8] = {
 
 __device__ __constant__ uint32_t SECP256K1_G_X[8] = {
     0x59F2815B, 0x16F81798, 0x029BFCDB, 0x2DCE28D9,
-    0x59F2815B, 0x16F81798, 0x029BFCDB, 0x79BE667E
+    0x029BFCDB, 0x16F81798, 0x59F2815B, 0x79BE667E
 };
 __device__ __constant__ uint32_t SECP256K1_G_Y[8] = {
     0x9C47D08F, 0xFB10D4B8, 0x3F482E3E, 0xE336A456,
-    0xC10E5C8C, 0xBCE6FAAD, 0xA6325525, 0x483ADA77
+    0xA6325525, 0xBCE6FAAD, 0xC10E5C8C, 0x483ADA77
 };
 
 struct fe {
@@ -25,18 +24,17 @@ struct Point {
     fe X, Y, Z;
 };
 
-__device__ void fe_copy(fe &r, const fe &a) {
-    #pragma unroll
-    for (int i = 0; i < 8; i++) r.v[i] = a.v[i];
-}
-
-__device__ void fe_zero(fe &r) {
+__device__ void fe_zero(fe& r) {
     #pragma unroll
     for (int i = 0; i < 8; i++) r.v[i] = 0;
 }
 
-__device__ void fe_mod(fe &r) {
-    // Simple compare and subtract method
+__device__ void fe_copy(fe& r, const fe& a) {
+    #pragma unroll
+    for (int i = 0; i < 8; i++) r.v[i] = a.v[i];
+}
+
+__device__ void fe_mod(fe& r) {
     bool ge = true;
     for (int i = 7; i >= 0; i--) {
         if (r.v[i] > SECP256K1_P[i]) break;
@@ -52,7 +50,7 @@ __device__ void fe_mod(fe &r) {
     }
 }
 
-__device__ void fe_add(fe &r, const fe &a, const fe &b) {
+__device__ void fe_add(fe& r, const fe& a, const fe& b) {
     uint64_t carry = 0;
     for (int i = 0; i < 8; i++) {
         carry += (uint64_t)a.v[i] + b.v[i];
@@ -62,7 +60,7 @@ __device__ void fe_add(fe &r, const fe &a, const fe &b) {
     fe_mod(r);
 }
 
-__device__ void fe_sub(fe &r, const fe &a, const fe &b) {
+__device__ void fe_sub(fe& r, const fe& a, const fe& b) {
     uint64_t borrow = 0;
     for (int i = 0; i < 8; i++) {
         uint64_t tmp = (uint64_t)a.v[i] - b.v[i] - borrow;
@@ -79,7 +77,7 @@ __device__ void fe_sub(fe &r, const fe &a, const fe &b) {
     }
 }
 
-__device__ void fe_mul(fe &r, const fe &a, const fe &b) {
+__device__ void fe_mul(fe& r, const fe& a, const fe& b) {
     uint64_t t[16] = {0};
     for (int i = 0; i < 8; ++i)
         for (int j = 0; j < 8; ++j)
@@ -93,14 +91,13 @@ __device__ void fe_mul(fe &r, const fe &a, const fe &b) {
     fe_mod(r);
 }
 
-__device__ void fe_inv(fe &r, const fe &a) {
+__device__ void fe_inv(fe& r, const fe& a) {
     fe u, v, x1, x2;
     fe_copy(u, a);
     for (int i = 0; i < 8; i++) {
         v.v[i] = SECP256K1_P[i];
         x1.v[i] = 1; x2.v[i] = 0;
     }
-
     while (true) {
         bool u_zero = true, v_zero = true;
         for (int i = 0; i < 8; i++) {
@@ -143,9 +140,10 @@ __device__ void fe_inv(fe &r, const fe &a) {
     fe_mod(r);
 }
 
-// Jacobian ops (point_add, point_double same as before)
-// Final step: affine_from_jacobian
-__device__ void affine_from_jacobian(uint8_t* out33, const Point &P) {
+__device__ void point_double(Point& r, const Point& p);
+__device__ void point_add(Point& r, const Point& p, const Point& q);
+
+__device__ void affine_from_jacobian(uint8_t* out33, const Point& P) {
     fe z_inv, z2, z3, x_affine, y_affine;
     fe_inv(z_inv, P.Z);
     fe_mul(z2, z_inv, z_inv);
@@ -161,6 +159,8 @@ __device__ void affine_from_jacobian(uint8_t* out33, const Point &P) {
         out33[1 + i * 4 + 3] = x_affine.v[7 - i] & 0xFF;
     }
 }
+
+__device__ void scalar_mult(Point& r, const fe& scalar);
 
 __device__ void generate_compressed_pubkey(uint64_t priv, uint8_t* out33) {
     fe scalar = {0};
