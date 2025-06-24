@@ -82,20 +82,21 @@ __device__ __forceinline__ uint32_t rol(uint32_t x, uint32_t n) {
 }
 
 __device__ void ripemd160(const uint8_t* msg, size_t len, uint8_t* out) {
-    const uint32_t r[80] = {
-         0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,
-         7, 4,13, 1,10, 6,15, 3,12, 0, 9, 5, 2,14,11, 8,
-         3,10,14, 4, 9,15, 8, 1, 2, 7, 0, 6,13,11, 5,12,
-         1, 9,11,10, 0, 8,12, 4,13, 3, 7,15,14, 5, 6, 2,
-         4, 0, 5, 9, 7,12, 2,10,14, 1, 3, 8,11, 6,15,13
+    const uint32_t r[16] = {
+        0, 1, 2, 3, 4, 5, 6, 7,
+        8, 9,10,11,12,13,14,15
     };
-
-    const uint32_t s[80] = {
-        11,14,15,12, 5, 8, 7, 9,11,13,14,15, 6, 7, 9, 8,
-         7, 6, 8,13,11, 9, 7,15, 7,12,15, 9,11, 7,13,12,
-        11,13, 6, 7,14, 9,13,15,14, 8,13, 6, 5,12, 7, 5,
-        11,12,14,15,14,15, 9, 8, 9,14, 5, 6, 8, 6, 5,12,
-         9,15, 5,11, 6, 8,13,12, 5,12,13,14,11, 8, 5, 6
+    const uint32_t rp[16] = {
+         5,14, 7, 0, 9, 2,11, 4,
+        13, 6,15, 8, 1,10, 3,12
+    };
+    const uint32_t s[16] = {
+        11,14,15,12, 5, 8, 7, 9,
+        11,13,14,15, 6, 7, 9, 8
+    };
+    const uint32_t sp[16] = {
+         8, 9, 9,11,13,15,15, 5,
+         7, 7, 8,11,14,14,12, 6
     };
 
     uint32_t h0 = 0x67452301;
@@ -104,58 +105,42 @@ __device__ void ripemd160(const uint8_t* msg, size_t len, uint8_t* out) {
     uint32_t h3 = 0x10325476;
     uint32_t h4 = 0xC3D2E1F0;
 
-    uint8_t padded[64] = {0};
-    for (int i = 0; i < len && i < 64; ++i)
-        padded[i] = msg[i];
-    padded[len] = 0x80;
+    uint8_t block[64] = {0};
+    for (size_t i = 0; i < len && i < 64; ++i) block[i] = msg[i];
+    block[len] = 0x80;
     uint64_t bit_len = len * 8;
-    for (int i = 0; i < 8; ++i)
-        padded[56 + i] = (bit_len >> (8 * i)) & 0xFF;
+    for (int i = 0; i < 8; ++i) block[56 + i] = (bit_len >> (8 * i)) & 0xFF;
 
     uint32_t X[16];
-    for (int i = 0; i < 16; ++i) {
-        X[i] = (padded[i * 4 + 0]) |
-               (padded[i * 4 + 1] << 8) |
-               (padded[i * 4 + 2] << 16) |
-               (padded[i * 4 + 3] << 24);
+    for (int i = 0; i < 16; ++i)
+        X[i] = ((uint32_t)block[i * 4 + 0]) |
+               ((uint32_t)block[i * 4 + 1] << 8) |
+               ((uint32_t)block[i * 4 + 2] << 16) |
+               ((uint32_t)block[i * 4 + 3] << 24);
+
+    uint32_t A = h0, B = h1, C = h2, D = h3, E = h4;
+    uint32_t Ap = h0, Bp = h1, Cp = h2, Dp = h3, Ep = h4;
+
+    for (int j = 0; j < 16; ++j) {
+        uint32_t T = rol(A + (B ^ C ^ D) + X[r[j]], s[j]) + E;
+        A = E; E = D; D = rol(C, 10); C = B; B = T;
+
+        T = rol(Ap + ((Bp & Dp) | (~Bp & Cp)) + X[rp[j]] + 0x50A28BE6, sp[j]) + Ep;
+        Ap = Ep; Ep = Dp; Dp = rol(Cp, 10); Cp = Bp; Bp = T;
     }
 
-    uint32_t A1 = h0, B1 = h1, C1 = h2, D1 = h3, E1 = h4;
-    uint32_t A2 = h0, B2 = h1, C2 = h2, D2 = h3, E2 = h4;
-
-    for (int j = 0; j < 80; j++) {
-        uint32_t T = rol(A1 + ((j <= 15) ? (B1 ^ C1 ^ D1) : (j <= 31) ? ((B1 & C1) | (~B1 & D1)) : (j <= 47) ? ((B1 | ~C1) ^ D1) : (j <= 63) ? ((B1 & D1) | (C1 & ~D1)) : (B1 ^ (C1 | ~D1)) + X[r[j]] + ((j <= 15) ? 0x00000000 : (j <= 31) ? 0x5A827999 : (j <= 47) ? 0x6ED9EBA1 : (j <= 63) ? 0x8F1BBCDC : 0xA953FD4E), s[j]) + E1;
-        A1 = E1; E1 = D1; D1 = rol(C1, 10); C1 = B1; B1 = T;
-
-        T = rol(A2 + ((j <= 15) ? (B2 ^ C2 ^ D2) : (j <= 31) ? ((B2 & D2) | (C2 & ~D2)) : (j <= 47) ? ((B2 | ~C2) ^ D2) : (j <= 63) ? ((B2 & C2) | (~B2 & D2)) : (B2 ^ C2 ^ D2)) + X[r[79 - j]] + ((j <= 15) ? 0x50A28BE6 : (j <= 31) ? 0x5C4DD124 : (j <= 47) ? 0x6D703EF3 : (j <= 63) ? 0x7A6D76E9 : 0x00000000), s[j]) + E2;
-        A2 = E2; E2 = D2; D2 = rol(C2, 10); C2 = B2; B2 = T;
-    }
-
-    uint32_t T = h1 + C1 + D2;
-    h1 = h2 + D1 + E2;
-    h2 = h3 + E1 + A2;
-    h3 = h4 + A1 + B2;
-    h4 = h0 + B1 + C2;
+    uint32_t T = h1 + C + Dp;
+    h1 = h2 + D + Ep;
+    h2 = h3 + E + Ap;
+    h3 = h4 + A + Bp;
+    h4 = h0 + B + Cp;
     h0 = T;
 
-    out[0] = h0 & 0xFF;
-    out[1] = (h0 >> 8) & 0xFF;
-    out[2] = (h0 >> 16) & 0xFF;
-    out[3] = (h0 >> 24) & 0xFF;
-    out[4] = h1 & 0xFF;
-    out[5] = (h1 >> 8) & 0xFF;
-    out[6] = (h1 >> 16) & 0xFF;
-    out[7] = (h1 >> 24) & 0xFF;
-    out[8] = h2 & 0xFF;
-    out[9] = (h2 >> 8) & 0xFF;
-    out[10] = (h2 >> 16) & 0xFF;
-    out[11] = (h2 >> 24) & 0xFF;
-    out[12] = h3 & 0xFF;
-    out[13] = (h3 >> 8) & 0xFF;
-    out[14] = (h3 >> 16) & 0xFF;
-    out[15] = (h3 >> 24) & 0xFF;
-    out[16] = h4 & 0xFF;
-    out[17] = (h4 >> 8) & 0xFF;
-    out[18] = (h4 >> 16) & 0xFF;
-    out[19] = (h4 >> 24) & 0xFF;
+    for (int i = 0; i < 4; ++i) {
+        out[i]      = (h0 >> (8 * i)) & 0xFF;
+        out[4 + i]  = (h1 >> (8 * i)) & 0xFF;
+        out[8 + i]  = (h2 >> (8 * i)) & 0xFF;
+        out[12 + i] = (h3 >> (8 * i)) & 0xFF;
+        out[16 + i] = (h4 >> (8 * i)) & 0xFF;
+    }
 }
