@@ -140,8 +140,97 @@ __device__ void fe_inv(fe& r, const fe& a) {
     fe_mod(r);
 }
 
-__device__ void point_double(Point& r, const Point& p);
-__device__ void point_add(Point& r, const Point& p, const Point& q);
+__device__ void point_from_G(Point& P) {
+    for (int i = 0; i < 8; i++) {
+        P.X.v[i] = SECP256K1_G_X[i];
+        P.Y.v[i] = SECP256K1_G_Y[i];
+        P.Z.v[i] = (i == 0) ? 1 : 0;
+    }
+}
+
+__device__ void point_double(Point& r, const Point& p) {
+    fe S, M, T, X3, Y3, Z3;
+    fe_mul(S, p.Y, p.Y);
+    fe_mul(T, S, p.X);
+    fe_add(S, S, S);
+    fe_add(S, S, S);
+    fe_add(S, S, S);
+    fe_mul(M, p.X, p.X);
+    fe_add(M, M, M);
+    fe_add(M, M, M);
+    fe_add(M, M, M);
+    fe_mul(X3, M, M);
+    fe_sub(X3, X3, S);
+    fe_sub(X3, X3, S);
+    fe_sub(T, S, X3);
+    fe_mul(Y3, M, T);
+    fe_mul(S, p.Y, p.Y);
+    fe_mul(S, S, S);
+    fe_sub(Y3, Y3, S);
+    fe_add(Z3, p.Y, p.Z);
+    fe_mul(Z3, Z3, Z3);
+    fe_sub(Z3, Z3, p.Y);
+    fe_sub(Z3, Z3, p.Z);
+    fe_mul(Z3, Z3, p.Z);
+    fe_copy(r.X, X3);
+    fe_copy(r.Y, Y3);
+    fe_copy(r.Z, Z3);
+}
+
+__device__ void point_add(Point& r, const Point& p, const Point& q) {
+    fe U1, U2, S1, S2, H, R, H2, H3, U1H2, X3, Y3, Z3;
+    fe_mul(U1, p.X, q.Z);
+    fe_mul(U1, U1, q.Z);
+    fe_mul(U2, q.X, p.Z);
+    fe_mul(U2, U2, p.Z);
+    fe_mul(S1, p.Y, q.Z);
+    fe_mul(S1, S1, q.Z);
+    fe_mul(S2, q.Y, p.Z);
+    fe_mul(S2, S2, p.Z);
+    fe_sub(H, U2, U1);
+    fe_sub(R, S2, S1);
+    fe_mul(H2, H, H);
+    fe_mul(H3, H2, H);
+    fe_mul(U1H2, U1, H2);
+    fe_mul(X3, R, R);
+    fe_sub(X3, X3, H3);
+    fe_sub(X3, X3, U1H2);
+    fe_sub(X3, X3, U1H2);
+    fe_sub(Y3, U1H2, X3);
+    fe_mul(Y3, Y3, R);
+    fe_mul(S1, S1, H3);
+    fe_sub(Y3, Y3, S1);
+    fe_add(Z3, p.Z, q.Z);
+    fe_mul(Z3, Z3, Z3);
+    fe_sub(Z3, Z3, p.Z);
+    fe_sub(Z3, Z3, q.Z);
+    fe_mul(Z3, Z3, H);
+    fe_copy(r.X, X3);
+    fe_copy(r.Y, Y3);
+    fe_copy(r.Z, Z3);
+}
+
+__device__ void scalar_mult(Point& r, const fe& scalar) {
+    Point Q;
+    bool started = false;
+    for (int i = 255; i >= 0; --i) {
+        if (started) point_double(Q, Q);
+        int limb = i / 32;
+        int bit = i % 32;
+        if ((scalar.v[limb] >> bit) & 1) {
+            if (!started) {
+                point_from_G(Q);
+                started = true;
+            } else {
+                Point G;
+                point_from_G(G);
+                point_add(Q, Q, G);
+            }
+        }
+    }
+    if (started) r = Q;
+    else point_from_G(r);
+}
 
 __device__ void affine_from_jacobian(uint8_t* out33, const Point& P) {
     fe z_inv, z2, z3, x_affine, y_affine;
@@ -150,7 +239,6 @@ __device__ void affine_from_jacobian(uint8_t* out33, const Point& P) {
     fe_mul(z3, z2, z_inv);
     fe_mul(x_affine, P.X, z2);
     fe_mul(y_affine, P.Y, z3);
-
     out33[0] = (y_affine.v[0] & 1) ? 0x03 : 0x02;
     for (int i = 0; i < 8; i++) {
         out33[1 + i * 4 + 0] = (x_affine.v[7 - i] >> 24) & 0xFF;
@@ -159,8 +247,6 @@ __device__ void affine_from_jacobian(uint8_t* out33, const Point& P) {
         out33[1 + i * 4 + 3] = x_affine.v[7 - i] & 0xFF;
     }
 }
-
-__device__ void scalar_mult(Point& r, const fe& scalar);
 
 __device__ void generate_compressed_pubkey(const uint8_t priv[32], uint8_t pubkey[33]) {
     fe scalar = {0};
@@ -171,7 +257,6 @@ __device__ void generate_compressed_pubkey(const uint8_t priv[32], uint8_t pubke
             ((uint32_t)priv[30 - i * 4] << 8)  |
             ((uint32_t)priv[31 - i * 4]);
     }
-
     Point R;
     scalar_mult(R, scalar);
     affine_from_jacobian(pubkey, R);
