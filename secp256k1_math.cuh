@@ -162,13 +162,17 @@ __device__ void affine_from_jacobian(uint8_t* out33, const Point& P) {
 
 __device__ void scalar_mult(Point& r, const fe& scalar);
 
-__device__ void generate_compressed_pubkey(uint64_t priv, uint8_t* out33) {
+__device__ void generate_compressed_pubkey(const uint8_t priv[32], uint8_t pubkey[33]) {
     fe scalar = {0};
-    scalar.v[0] = (uint32_t)(priv & 0xFFFFFFFF);
-    scalar.v[1] = (uint32_t)((priv >> 32) & 0xFFFFFFFF);
-    for (int i = 2; i < 8; i++) scalar.v[i] = 0;
+    for (int i = 0; i < 8; i++) {
+        scalar.v[i] = 
+            ((uint32_t)priv[28 - i * 4] << 24) |
+            ((uint32_t)priv[29 - i * 4] << 16) |
+            ((uint32_t)priv[30 - i * 4] << 8)  |
+            ((uint32_t)priv[31 - i * 4]);
+    }
 
     Point R;
     scalar_mult(R, scalar);
-    affine_from_jacobian(out33, R);
+    affine_from_jacobian(pubkey, R);
 }
